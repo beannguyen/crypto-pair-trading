@@ -3,6 +3,7 @@ import statsmodels.api as sm
 import statsmodels.tsa.stattools as ts
 import pandas as pd
 
+
 # ~~~~~~~~~~~~~~~~~~~~~~ TESTS FOR FINDING PAIR TO TRADE ON ~~~~~~~~~~~~~~~~~~~~~~
 class ADF(object):
     """
@@ -26,7 +27,7 @@ class ADF(object):
 
     def use_P(self):
         return (self.p_value > self.p_min) and (self.p_value < self.p_max)
-    
+
     def use_critical(self):
         return abs(self.perc_stat) > abs(self.five_perc_stat)
 
@@ -96,7 +97,7 @@ class Hurst():
         self.look_back = 126
         self.lag_max = 100
         self.h_value = None
-    
+
     def apply_hurst(self, time_series):
         """Returns the Hurst Exponent of the time series vector ts"""
         # Create the range of lag values
@@ -109,10 +110,11 @@ class Hurst():
         poly = np.polyfit(np.log10(lags), np.log10(tau), 1)
 
         # Return the Hurst exponent from the polyfit output
-        self.h_value = poly[0]*2.0 
+        self.h_value = poly[0] * 2.0
 
     def use(self):
         return (self.h_value < self.h_max) and (self.h_value > self.h_min)
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~ FUNCTIONS FOR FILING AN ORDER ~~~~~~~~~~~~~~~~~~~~~~
 def hedge_ratio(Y, X):
@@ -121,23 +123,28 @@ def hedge_ratio(Y, X):
     model = sm.OLS(Y, X).fit()
     return model.params[1]
 
+
 def softmax_order(stock_1_shares, stock_2_shares, stock_1_price, stock_2_price):
     stock_1_cost = stock_1_shares * stock_1_price
     stock_2_cost = stock_2_shares * stock_2_price
     costs = np.array([stock_1_cost, stock_2_cost])
     return np.exp(costs) / np.sum(np.exp(costs), axis=0)
 
+
 def initialize(context):
     """
     Called once at the start of the algorithm.
     """
-    
-    context.asset_pairs = [[symbol('MSFT'), symbol('AAPL'), {'in_short': False, 'in_long': False, 'spread': np.array([]), 'hedge_history': np.array([])}], 
-                           [symbol('YUM'), symbol('MCD'), {'in_short': False, 'in_long': False, 'spread': np.array([]), 'hedge_history': np.array([])}]]
+
+    context.asset_pairs = [[symbol('MSFT'), symbol('AAPL'),
+                            {'in_short': False, 'in_long': False, 'spread': np.array([]),
+                             'hedge_history': np.array([])}],
+                           [symbol('YUM'), symbol('MCD'), {'in_short': False, 'in_long': False, 'spread': np.array([]),
+                                                           'hedge_history': np.array([])}]]
     context.z_back = 20
     context.hedge_lag = 2
     context.entry_z = 0.5
-    
+
     schedule_function(my_handle_data, date_rules.every_day(),
                       time_rules.market_close(hours=4))
     # Typical slippage and commision I have seen others use and is used in templates by Quantopian
@@ -149,20 +156,21 @@ def my_handle_data(context, data):
     """
     Called every day.
     """
-    
+
     if get_open_orders():
         return
-    
+
     for i in range(len(context.asset_pairs)):
-        pair = context.asset_pairs[i]      
+        pair = context.asset_pairs[i]
         new_pair = process_pair(pair, context, data)
         context.asset_pairs[i] = new_pair
+
 
 def process_pair(pair, context, data):
     """
     Main function that will execute an order for every pair.
     """
-    
+
     # Get stock data
     stock_1 = pair[0]
     stock_2 = pair[1]
@@ -179,13 +187,15 @@ def process_pair(pair, context, data):
         hedge = hedge_ratio(stock_1_P, stock_2_P)
     except ValueError as e:
         log.error(e)
-        return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
-    
+        return [stock_1, stock_2,
+                {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+
     hedge_history = np.append(hedge_history, hedge)
-    
+
     if hedge_history.size < context.hedge_lag:
         log.debug("Hedge history too short!")
-        return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+        return [stock_1, stock_2,
+                {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
 
     hedge = hedge_history[-context.hedge_lag]
     spread = np.append(
@@ -198,16 +208,17 @@ def process_pair(pair, context, data):
 
     # Check if current window size is large enough for adf, half life, and hurst exponent
     if (spread_length < adf.look_back) or (spread_length < half_life.look_back) or (spread_length < hurst.look_back):
-        return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+        return [stock_1, stock_2,
+                {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
 
-    
     # possible "SVD did not converge" error because of OLS
     try:
         adf.apply_adf(spread[-adf.look_back:])
         half_life.apply_half_life(spread[-half_life.look_back:])
         hurst.apply_hurst(spread[-hurst.look_back:])
     except:
-        return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+        return [stock_1, stock_2,
+                {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
 
     # Check if they are in fact a stationary (or possibly trend stationary...need to avoid this) time series
     # * Only cancel if all measures believe it isn't stationary
@@ -219,18 +230,21 @@ def process_pair(pair, context, data):
             order_target(stock_1, 0)
             order_target(stock_2, 0)
             in_short = in_long = False
-            return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
-            
+            return [stock_1, stock_2,
+                    {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+
         log.debug("Not Stationary!")
-        return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
-    
+        return [stock_1, stock_2,
+                {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+
     # Check if current window size is large enough for Z score
     if spread_length < context.z_back:
-        return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+        return [stock_1, stock_2,
+                {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
 
     spreads = spread[-context.z_back:]
     z_score = (spreads[-1] - spreads.mean()) / spreads.std()
-    
+
     # Record measures
     if stock_1 == sid(5061):
         record(Z_tech=z_score)
@@ -238,21 +252,23 @@ def process_pair(pair, context, data):
     else:
         record(Z_food=z_score)
         record(Hedge_food=hedge)
-    
+
     # Close order logic
     if in_short and z_score < 0.0:
         order_target(stock_1, 0)
         order_target(stock_2, 0)
         in_short = False
         in_long = False
-        return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+        return [stock_1, stock_2,
+                {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
     elif in_long and z_score > 0.0:
         order_target(stock_1, 0)
         order_target(stock_2, 0)
         in_short = False
         in_long = False
-        return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
-    
+        return [stock_1, stock_2,
+                {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+
     # Open order logic
     if (z_score < -context.entry_z) and (not in_long):
         stock_1_shares = 1
@@ -262,7 +278,8 @@ def process_pair(pair, context, data):
         (stock_1_perc, stock_2_perc) = softmax_order(stock_1_shares, stock_2_shares, stock_1_P[-1], stock_2_P[-1])
         order_target_percent(stock_1, stock_1_perc)
         order_target_percent(stock_2, stock_2_perc)
-        return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+        return [stock_1, stock_2,
+                {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
     elif z_score > context.entry_z and (not in_short):
         stock_1_shares = -1
         stock_2_shares = hedge
@@ -271,6 +288,8 @@ def process_pair(pair, context, data):
         (stock_1_perc, stock_2_perc) = softmax_order(stock_1_shares, stock_2_shares, stock_1_P[-1], stock_2_P[-1])
         order_target_percent(stock_1, stock_1_perc)
         order_target_percent(stock_2, stock_2_perc)
-        return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+        return [stock_1, stock_2,
+                {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
 
-    return [stock_1, stock_2, {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]
+    return [stock_1, stock_2,
+            {'in_short': in_short, 'in_long': in_long, 'spread': spread, 'hedge_history': hedge_history}]

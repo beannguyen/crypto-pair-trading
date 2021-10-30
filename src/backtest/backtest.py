@@ -2,11 +2,12 @@ from datetime import datetime
 
 import backtrader as bt
 import backtrader.feeds as btfeeds
-import numpy as np
 import pandas as pd
 
-from src.backtest import BasePairTradingStrategy, feed
-from src.backtest.feed import zscore
+from backtest import feed
+from backtest.base_strategy import BasePairTradingStrategy
+from backtest.feed import zscore
+from stats_arb.johansen import find_cointegration_pairs
 
 DATA_PATH = '../data'
 
@@ -28,98 +29,38 @@ def read_data(symbol):
 
 
 class PairTradingStrategy(BasePairTradingStrategy):
-    params = dict(
-        period=10,
-        stake=10,
-        qty1=0,
-        qty2=0,
-        qty3=0,
-        printout=True,
-        upper=1,
-        lower=-1,
-        up_medium=0.8,
-        low_medium=-0.8,
-        status=0,
-        portfolio_value=1000,
-    )
-
     def __init__(self):
-        # To control operation entries
-        self.orderid = None
-        self.qty1 = self.p.qty1
-        self.qty2 = self.p.qty2
-        self.qty3 = self.p.qty3
-        self.upper_limit = self.p.upper
-        self.lower_limit = self.p.lower
-        self.up_medium = self.p.up_medium
-        self.low_medium = self.p.low_medium
-        self.status = self.p.status
-        self.portfolio_value = self.p.portfolio_value
-
-        self.zscore = self.data4.zscore
+        super().__init__()
+        self.portfolio = None
 
     def next(self):
-        if self.orderid:
-            return  # if an order is active, no new orders are allowed
+        # if no portfolio constructed yet
+        if self.portfolio is None:
+            self.construct_portfolio()
+        else:
+            if not self.in_position:
+                if not self.test_stationary():
+                    self.construct_portfolio()
 
-        # Step 2: Check conditions for SHORT & place the order
-        # Checking the condition for SHORT
-        if (self.zscore[0] > self.upper_limit) and (self.status != 1):
-            # Calculating the number of shares for each stock
-            value = (1 / 3) * self.portfolio_value  # Divide the cash equally
-            s1 = value / self.data0.close
-            s2 = value / self.data1.close
-            s3 = value / self.data2.close
-            print('s1 + self.qty1 is', s1 + self.qty1)
-            print('s2 + self.qty1 is', s2 + self.qty2)
-            print('s3 + self.qty1 is', s3 + self.qty3)
+        self.trade()
 
-            # Placing the order
-            self.log('SELL CREATE %s, price = %.2f, qty = %d' % (self.data0._name, self.data0.close[0], s1 + self.qty1))
-            self.sell(data=self.data0, size=(s1 + self.qty1))
-            self.log('BUY CREATE %s, price = %.2f, qty = %d' % (self.data1._name, self.data1.close[0], s2 + self.qty2))
-            self.buy(data=self.data1, size=(s2 + self.qty2))
-            self.log('BUY CREATE %s, price = %.2f, qty = %d' % (self.data2._name, self.data2.close[0], s3 + self.qty3))
-            self.buy(data=self.data2, size=(s3 + self.qty3))
+    def construct_portfolio(self):
+        pairs = find_cointegration_pairs(self.df, symbols=symbols)
+        if len(pairs) == 0:
+            return
 
-            # Updating the counters with new value
-            self.qty1 = s1  # The new open position quantity for Stock1 is s1 shares
-            self.qty2 = s2  # The new open position quantity for Stock2 is s2 shares
-            self.qty3 = s3  # The new open position quantity for Stock3 is s3 shares
 
-            self.status = 1  # The current status is "short the spread"
-        elif (self.zscore[0] < self.lower_limit) and (self.status != 2):
-            # Step 3: Check conditions for LONG & place the order
-            # Checking the condition for LONG
-            value = (1 / 3) * self.portfolio_value  # Divide the cash equally
-            s1 = value / self.data0.close
-            s2 = value / self.data1.close
-            s3 = value / self.data2.close
-            print('s1 + self.qty1 is', s1 + self.qty1)
-            print('s2 + self.qty1 is', s2 + self.qty2)
-            print('s3 + self.qty1 is', s3 + self.qty3)
 
-            # Place the order
-            self.log('BUY CREATE %s, price = %.2f, qty = %d' % (self.data0._name, self.data0.close[0], s1 + self.qty1))
-            self.buy(data=self.data0, size=(s1 + self.qty1))  # Place an order for buying x + qty1 shares
-            self.log('SELL CREATE %s, price = %.2f, qty = %d' % (self.data1._name, self.data1.close[0], s2 + self.qty2))
-            self.sell(data=self.data1, size=(s2 + self.qty2))  # Place an order for selling y + qty2 shares
-            self.log('SELL CREATE %s, price = %.2f, qty = %d' % (self.data2._name, self.data2.close[0], s3 + self.qty2))
-            self.sell(data=self.data2, size=(s3 + self.qty2))  # Place an order for selling y + qty2 shares
+    def test_stationary(self):
+        pass
 
-            # Updating the counters with new value
-            self.qty1 = s1
-            self.qty2 = s2
-            self.qty3 = s3
-            self.status = 2
-
+    def trade(self):
+        if (self.zscore[0] > self.upper_limit) and (self.status != 1) and not self.in_position:
+            self.short_spread()
+        elif (self.zscore[0] < self.lower_limit) and (self.status != 2) and not self.in_position:
+            self.short_spread()
         elif self.up_medium > self.zscore[0] > self.low_medium and self.getposition(self.data0):
-            # Step 4: Check conditions for No Trade
-            # If the z-score is within the two bounds, close all
-            self.close(self.data0)
-            self.close(self.data1)
-            self.close(self.data2)
-            self.status = 0
+            self.close_all()
 
     def stop(self):
         print('==================================================')
