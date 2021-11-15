@@ -1,4 +1,4 @@
-from backtest import BasePairTradingStrategy
+from backtest_crypto import BasePairTradingStrategy
 
 
 class JohansenPairTradingStrategy(BasePairTradingStrategy):

@@ -1,37 +1,35 @@
 import backtrader as bt
+import numpy as np
+
+LONG = 'long'
+SHORT = 'short'
 
 
 class BasePairTradingStrategy(bt.Strategy):
     params = dict(
-        period=10,
-        stake=10,
-        qty1=0,
-        qty2=0,
-        qty3=0,
+        lookback=1000,
         printout=True,
-        upper=1,
-        lower=-1,
-        up_medium=0.8,
-        low_medium=-0.8,
         status=0,
-        portfolio_value=1000,
-        df=None
+        df=None,
+        nb_symbols=4,
+        symbols=None,
+        names=None,
+        hedge_ratio=None
     )
 
     def __init__(self):
-        # To control operation entries
-        self.orderid = None
-        self.qty1 = self.p.qty1
-        self.qty2 = self.p.qty2
-        self.qty3 = self.p.qty3
-        self.upper_limit = self.p.upper
-        self.lower_limit = self.p.lower
-        self.up_medium = self.p.up_medium
-        self.low_medium = self.p.low_medium
         self.status = self.p.status
-        self.portfolio_value = self.p.portfolio_value
+        self.nb_symbols = self.p.nb_symbols
+        self.lookback = self.p.lookback
         self.df = self.p.df
         self.in_position = False
+        self.portfolio = None
+        self.zscore = None
+        self.spread = None
+        self.portfolio_constructed_at = None
+        self.sl_spread = None
+        self.hedge_ratio = None
+        self.symbols = self.p.symbols
 
     def log(self, txt, dt=None):
         if self.p.printout:
@@ -39,16 +37,34 @@ class BasePairTradingStrategy(bt.Strategy):
             dt = bt.num2date(dt)
             print('%s, %s' % (dt.isoformat(), txt))
 
+    def prenext(self):
+        # call next() even when data is not available for all tickers
+        self.next()
+
+    def notify_trade(self, trade):
+        if not trade.isclosed:
+            return
+
+        self.log('OPERATION PROFIT, GROSS %.4f, NET %.4f' %
+                 (trade.pnl, trade.pnlcomm))
+        self.log(f'ACCOUNT VALUE: {self.broker.get_value()}')
+
     def notify_order(self, order):
         if order.status in [bt.Order.Submitted, bt.Order.Accepted]:
             return  # Await further notifications
 
         if order.status == order.Completed:
             if order.isbuy():
-                buytxt = 'BUY COMPLETE, %.2f' % order.executed.price
+                buytxt = f'BUY COMPLETE {order.data._name}, ' \
+                         f'price: {order.executed.price:.4f}, ' \
+                         f'size: {order.executed.size}, ' \
+                         f'cost {order.executed.price * order.executed.size:.4f}'
                 self.log(buytxt, order.executed.dt)
             else:
-                selltxt = 'SELL COMPLETE, %.2f' % order.executed.price
+                selltxt = f'SELL COMPLETE {order.data._name}, ' \
+                          f'price: {order.executed.price:.4f}, ' \
+                          f'size: {order.executed.size}' \
+                          f'cost {order.executed.price * order.executed.size:.4f}'
                 self.log(selltxt, order.executed.dt)
 
         elif order.status in [order.Expired, order.Canceled, order.Margin]:
@@ -56,58 +72,50 @@ class BasePairTradingStrategy(bt.Strategy):
             pass  # Simply log
 
     def short_spread(self):
-        # Calculating the number of shares for each stock
-        value = (1 / 3) * self.portfolio_value  # Divide the cash equally
-        s1 = value / self.data0.close
-        s2 = value / self.data1.close
-        s3 = value / self.data2.close
-        print('s1 + self.qty1 is', s1 + self.qty1)
-        print('s2 + self.qty1 is', s2 + self.qty2)
-        print('s3 + self.qty1 is', s3 + self.qty3)
-
-        # Placing the order
-        self.log('SELL CREATE %s, price = %.2f, qty = %d' % (self.data0._name, self.data0.close[0], s1 + self.qty1))
-        self.sell(data=self.data0, size=(s1 + self.qty1))
-        self.log('BUY CREATE %s, price = %.2f, qty = %d' % (self.data1._name, self.data1.close[0], s2 + self.qty2))
-        self.buy(data=self.data1, size=(s2 + self.qty2))
-        self.log('BUY CREATE %s, price = %.2f, qty = %d' % (self.data2._name, self.data2.close[0], s3 + self.qty3))
-        self.buy(data=self.data2, size=(s3 + self.qty3))
-
-        # Updating the counters with new value
-        self.qty1 = s1  # The new open position quantity for Stock1 is s1 shares
-        self.qty2 = s2  # The new open position quantity for Stock2 is s2 shares
-        self.qty3 = s3  # The new open position quantity for Stock3 is s3 shares
-
+        self.log(f'GO SHORT')
+        self.place_orders(SHORT)
         self.status = 1  # The current status is "short the spread"
         self.in_position = True
 
     def long_spread(self):
-        value = (1 / 3) * self.portfolio_value  # Divide the cash equally
-        s1 = value / self.data0.close
-        s2 = value / self.data1.close
-        s3 = value / self.data2.close
-        print('s1 + self.qty1 is', s1 + self.qty1)
-        print('s2 + self.qty1 is', s2 + self.qty2)
-        print('s3 + self.qty1 is', s3 + self.qty3)
-
-        # Place the order
-        self.log('BUY CREATE %s, price = %.2f, qty = %d' % (self.data0._name, self.data0.close[0], s1 + self.qty1))
-        self.buy(data=self.data0, size=(s1 + self.qty1))  # Place an order for buying x + qty1 shares
-        self.log('SELL CREATE %s, price = %.2f, qty = %d' % (self.data1._name, self.data1.close[0], s2 + self.qty2))
-        self.sell(data=self.data1, size=(s2 + self.qty2))  # Place an order for selling y + qty2 shares
-        self.log('SELL CREATE %s, price = %.2f, qty = %d' % (self.data2._name, self.data2.close[0], s3 + self.qty2))
-        self.sell(data=self.data2, size=(s3 + self.qty2))  # Place an order for selling y + qty2 shares
-
-        # Updating the counters with new value
-        self.qty1 = s1
-        self.qty2 = s2
-        self.qty3 = s3
+        self.log(f'GO LONG')
+        self.place_orders(LONG)
         self.status = 2
         self.in_position = True
 
+    def place_orders(self, side):
+        weights = self.cal_weights(side)
+        value = self.broker.get_value() * 0.6
+        for i in range(self.nb_symbols):
+            size = (value * weights[i]) / self.portfolio[i].close[0]
+            size = self.hedge_ratio[i]
+
+            if size > 0:
+                self.buy(data=self.portfolio[i], size=size)
+            else:
+                self.sell(data=self.portfolio[i], size=abs(size))
+
+    def cal_weights(self, side):
+        weights = []
+        total_cap = 0
+
+        hedge_ratio = self.hedge_ratio
+
+        if side == SHORT:
+            hedge_ratio = [-h for h in self.hedge_ratio]
+
+        for i in range(self.nb_symbols):
+            hedge_r = hedge_ratio[i]
+            total_cap += self.portfolio[i].close * abs(hedge_r)
+
+        for i in range(self.nb_symbols):
+            size_i = self.portfolio[i].close * hedge_ratio[i] / total_cap
+            weights.append(size_i)
+
+        return weights
+
     def close_all(self):
-        self.close(self.data0)
-        self.close(self.data1)
-        self.close(self.data2)
+        for i in range(self.nb_symbols):
+            self.close(self.portfolio[i])
         self.status = 0
         self.in_position = False
