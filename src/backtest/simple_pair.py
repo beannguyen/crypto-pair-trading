@@ -3,8 +3,7 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 from ta.volatility import BollingerBands
 import matplotlib.pyplot as plt
 
-from notebooks.Strategies.CryptoPairTradingV1.backtest.base_strategy import BasePairTradingStrategy
-from notebooks.Strategies.CryptoPairTradingV1.backtest.feed import zscore
+from backtest.base_strategy import BasePairTradingStrategy
 
 
 class SimplePairTradingStrategy(BasePairTradingStrategy):
@@ -27,13 +26,6 @@ class SimplePairTradingStrategy(BasePairTradingStrategy):
             self.construct_portfolio()
 
         self.trade()
-
-    def calculate_dynamic_hedge_ratio(self):
-        _df = self.df[self.names].dropna()
-
-        result = coint_johansen(_df, 0, 1)
-        v1 = result.evec[:, 0:1]
-        self.hedge_ratio = v1[:, 0]
 
     def construct_portfolio(self):
         current_date = self.datas[0].datetime.datetime(0)
@@ -92,3 +84,5 @@ class SimplePairTradingStrategy(BasePairTradingStrategy):
         print('Ending   Value - %.2f' % self.broker.getvalue())
         print('Ending   Cash - %.2f' % self.broker.getcash())
         print('==================================================')
+
+

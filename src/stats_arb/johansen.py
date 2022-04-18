@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
-from notebooks.Strategies.CryptoPairTradingV1.stats_arb.tests import adf_test, pp_test, kpss_test, cal_half_life
+from stats_arb.tests import adf_test, cal_half_life, kpss_test, pp_test
+
 
 p = 1
 COINTEGRATION_CONFIDENCE_LEVEL = 90

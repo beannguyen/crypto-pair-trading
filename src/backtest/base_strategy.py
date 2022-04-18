@@ -28,7 +28,7 @@ class BasePairTradingStrategy(bt.Strategy):
         self.spread = None
         self.portfolio_constructed_at = None
         self.sl_spread = None
-        self.hedge_ratio = None
+        self.hedge_ratio = self.p.hedge_ratio
         self.symbols = self.p.symbols
 
     def log(self, txt, dt=None):
@@ -68,7 +68,7 @@ class BasePairTradingStrategy(bt.Strategy):
                 self.log(selltxt, order.executed.dt)
 
         elif order.status in [order.Expired, order.Canceled, order.Margin]:
-            self.log('%s ,' % order.Status[order.status])
+            self.log('Order cancelled %s ,' % order.Status[order.status])
             pass  # Simply log
 
     def short_spread(self):
@@ -85,10 +85,10 @@ class BasePairTradingStrategy(bt.Strategy):
 
     def place_orders(self, side):
         weights = self.cal_weights(side)
-        value = self.broker.get_value() * 0.6
+        value = self.broker.get_value() * 0.3
         for i in range(self.nb_symbols):
-            size = (value * weights[i]) / self.portfolio[i].close[0]
-            size = self.hedge_ratio[i]
+            size = (value * np.sign(weights[i])) / self.portfolio[i].close[0]  # * weights[i]
+            # size = self.hedge_ratio[i] * 0.05
 
             if size > 0:
                 self.buy(data=self.portfolio[i], size=size)
