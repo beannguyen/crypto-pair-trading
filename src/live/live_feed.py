@@ -5,7 +5,6 @@ import logging
 import traceback
 from binance.lib.utils import config_logging
 from binance.websocket.futures.websocket_client import FuturesWebsocketClient as Client
-from itsdangerous import json
 import pandas as pd
 
 from live.utils import get_close_price, get_pair
