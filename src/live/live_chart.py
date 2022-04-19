@@ -9,6 +9,8 @@ import requests
 import time
 from datetime import datetime
 
+from live.utils import get_pair
+
 
 def to_dataframe(json_data):
     df = pd.DataFrame(
@@ -79,9 +81,9 @@ def zscore(series):
     return (series - series.mean()) / np.std(series)
 
 
-symbols = ['XRPUSDT','ADAUSDT']
-hedge = [30.68800711, -158.6123163]
-TF = '5m'
+filename = input('Enter the file name ')
+symbols, hedge, TF, precisions = get_pair(filename)
+print(f'Start charting {symbols} {hedge} {TF}')
 
 
 def concat_price(dfs):
@@ -118,22 +120,22 @@ def animate(i):
 
         df = concat_price([df1, df2])
         spread = df[symbols[0]] * hedge[0] + df[symbols[1]] * hedge[1]
-        spread = spread.iloc[:200]
+        spread = spread.iloc[-1000:]
         _z = zscore(spread)
 
         # Draw x and y lists
         ax.clear()
         ax.plot(_z.index, _z.values)
         ax.axhline(_z.mean(), color="black")
-        ax.axhline(3.0, color="red", linestyle="--")
-        ax.axhline(1.5, color="red", linestyle="--")
-        ax.axhline(-1.5, color="green", linestyle="--")
-        ax.axhline(-3.0, color="green", linestyle="--")
+        ax.axhline(2.0, color="red", linestyle="--")
+        ax.axhline(1, color="red", linestyle="--")
+        ax.axhline(-1, color="green", linestyle="--")
+        ax.axhline(-2.0, color="green", linestyle="--")
         # ax.legend(["Spread z-score", "Mean", "+1", "-1", "+2", "-2"])
     except:
         pass
 
 
 # Set up plot to call animate() function periodically
-ani = animation.FuncAnimation(fig, animate, interval=500)
+ani = animation.FuncAnimation(fig, animate, interval=5000)
 plt.show()

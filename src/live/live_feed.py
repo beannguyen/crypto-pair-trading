@@ -8,7 +8,7 @@ from binance.websocket.futures.websocket_client import FuturesWebsocketClient as
 from itsdangerous import json
 import pandas as pd
 
-from live.utils import get_close_price
+from live.utils import get_close_price, get_pair
 
 config_logging(logging, logging.DEBUG)
 
@@ -28,9 +28,9 @@ def read_price_data(symbol):
     return df
 
 
-symbols = ['XRPUSDT','ADAUSDT']
-hedge = [30.68800711, -158.6123163]
-TF = '5m'
+filename = input('Enter the file name ')
+symbols, hedge, TF, precisions = get_pair(filename)
+print(f'Start getting data {symbols} {hedge} {TF}')
 div = 0.5
 qty_ = [100, 100]
 
@@ -51,7 +51,7 @@ def message_handler(message):
         data[symbol] = data[symbol].append({"open_time": t, "close": kline["c"]}, ignore_index=True)
         data[symbol] = data[symbol].drop_duplicates(subset=['open_time'], keep='last')
         data[symbol].sort_index(inplace=True)
-        data[symbol] = data[symbol].iloc[-100:].copy()
+        data[symbol] = data[symbol].iloc[-1000:].copy()
         data[symbol].to_csv(f"{DATA_PATH}/{symbol}.csv", index=False)
     except:
         traceback.print_exc()

@@ -1,3 +1,4 @@
+from itsdangerous import json
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
@@ -80,5 +81,11 @@ def zscore(series):
 
 def get_close_price(symbol, interval="1m"):
     df = get_futures_data(symbol=symbol, interval=interval)
-    df.drop(columns=['open', 'high', 'low', 'volume'], inplace=True)
+    df.drop(columns=["open", "high", "low", "volume"], inplace=True)
     return df
+
+
+def get_pair(filename):
+    with open(f"live/{filename}.json") as f:
+        data = json.load(f)
+        return data["pair"], data["ratios"], data["tf"], data["precisions"]

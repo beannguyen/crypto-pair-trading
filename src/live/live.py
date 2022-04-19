@@ -6,7 +6,7 @@ from black import InvalidInput
 import numpy as np
 import pandas as pd
 
-from live.utils import zscore
+from live.utils import get_pair, zscore
 
 
 BASE_URL = "https://testnet.binancefuture.com"
@@ -129,15 +129,17 @@ def concat_price(dfs):
 
 
 DATA_PATH = "./feed"
-symbols = ['XRPUSDT','ADAUSDT']
-hedge = [30.68800711, -158.6123163]
-precisions = [1, 0]
 
-qty_ = [200, 200]
+filename = input('Enter the file name ')
+symbols, hedge, TF, precisions = get_pair(filename)
+print(f'Start trading {symbols} {hedge} {TF} {precisions}')
+# precisions = [2, 2]
+
+qty_ = [150, 150]
 order1, order2 = None, None
 
-upper_limit, middle, lower_limit = 1.5, 0, -1.5
-sl_upper, sl_lower = 3, -3
+upper_limit, middle, lower_limit = 1, 0, -1
+sl_upper, sl_lower = 2, -2
 status = 0
 position = False
 
@@ -168,7 +170,7 @@ while True:
 
                 df = concat_price([df1, df2])
                 spread = df[symbols[0]] * hedge[0] + df[symbols[1]] * hedge[1]
-                spread = spread.iloc[:200]
+                spread = spread.iloc[-1000:]
                 _z = zscore(spread)
 
                 if (

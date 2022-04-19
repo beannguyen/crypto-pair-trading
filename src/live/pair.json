@@ -1,0 +1,12 @@
+{
+    "pair": [
+        "ETHUSDT",
+        "BNBUSDT"
+    ],
+    "ratios": [
+        47.54270644,
+        -80.39289765
+    ],
+    "precisions": [2, 2],
+    "tf": "1h"
+}

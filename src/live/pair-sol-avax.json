@@ -1,0 +1,12 @@
+{
+    "pair": [
+        "SOLUSDT",
+        "AVAXUSDT"
+    ],
+    "ratios": [
+        232.57428951,
+        -245.56660808
+    ],
+    "precisions": [0, 0],
+    "tf": "5m"
+}
