@@ -97,8 +97,8 @@ class PairTradingStrategy(BasePairTradingStrategy):
             self.log(f'Long spread zscore {zscore} > {self.upper_limit}')
             self.long_spread()
         elif self.getposition(self.data0) and (
-            (zscore <= 0 and self.status == 1)
-            or (zscore >= 0 and self.status == 2)
+            (zscore <= -1 and self.status == 1)
+            or (zscore >= 1 and self.status == 2)
         ):
             self.log(f'Take profit {zscore} <> 0')
             self.close_all()

@@ -22,14 +22,14 @@ def read_price_data(symbol):
 
     df = get_close_price(symbol, interval=TF)
     df.reset_index(inplace=True)
-    df.columns = ['open_time', 'close']
+    df.columns = ["open_time", "close"]
     df.to_csv(filename, index=False)
     return df
 
 
-filename = input('Enter the file name ')
+filename = input("Enter the file name ")
 symbols, hedge, TF, precisions = get_pair(filename)
-print(f'Start getting data {symbols} {hedge} {TF}')
+print(f"Start getting data {symbols} {hedge} {TF}")
 div = 0.5
 qty_ = [100, 100]
 
@@ -47,8 +47,12 @@ def message_handler(message):
         t = datetime.fromtimestamp(int(kline["t"] / 1000), tz=timezone.utc)
         print(f'{symbol} - {t} close {kline["c"]}')
 
-        data[symbol] = data[symbol].append({"open_time": t, "close": kline["c"]}, ignore_index=True)
-        data[symbol] = data[symbol].drop_duplicates(subset=['open_time'], keep='last')
+        new_df = pd.DataFrame.from_records(
+            [{"open_time": t, "close": kline["c"]}]
+        )
+
+        data[symbol] = pd.concat([data[symbol], new_df])
+        data[symbol] = data[symbol].drop_duplicates(subset=["open_time"], keep="last")
         data[symbol].sort_index(inplace=True)
         data[symbol] = data[symbol].iloc[-1000:].copy()
         data[symbol].to_csv(f"{DATA_PATH}/{symbol}.csv", index=False)

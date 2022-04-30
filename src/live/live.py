@@ -135,7 +135,7 @@ symbols, hedge, TF, precisions = get_pair(filename)
 print(f'Start trading {symbols} {hedge} {TF} {precisions}')
 # precisions = [2, 2]
 
-qty_ = [150, 150]
+qty_ = [200, 200]
 order1, order2 = None, None
 
 upper_limit, middle, lower_limit = 1, 0, -1
