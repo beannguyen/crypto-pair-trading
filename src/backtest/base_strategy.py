@@ -85,7 +85,7 @@ class BasePairTradingStrategy(bt.Strategy):
 
     def place_orders(self, side):
         weights = self.cal_weights(side)
-        value = self.broker.get_value() * 0.3
+        value = self.broker.get_value() * 0.1
         for i in range(self.nb_symbols):
             size = (value * np.sign(weights[i])) / self.portfolio[i].close[0]  # * weights[i]
             # size = self.hedge_ratio[i] * 0.05

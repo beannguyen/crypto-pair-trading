@@ -7,33 +7,39 @@ from statsmodels.tsa.stattools import adfuller, kpss
 
 def kpss_test(timeseries, verbose=False):
     kpsstest = kpss(timeseries, nlags="auto")
-    kpss_output = pd.Series(kpsstest[0:3], index=[
-        'Test Statistic', 'p-value', 'Lags Used'])
+    kpss_output = pd.Series(
+        kpsstest[0:3], index=["Test Statistic", "p-value", "Lags Used"]
+    )
 
     if verbose:
-        print('Results of KPSS Test:')
+        print("Results of KPSS Test:")
         for key, value in kpsstest[3].items():
-            kpss_output['Critical Value (%s)' % key] = value
+            kpss_output["Critical Value (%s)" % key] = value
 
-        p_val = kpss_output['p-value']
-        print(
-            f'Result: The series is {"not " if p_val < 0.05 else ""}stationary')
-    return kpss_output['p-value']
+        p_val = kpss_output["p-value"]
+        print(f'Result: The series is {"not " if p_val < 0.05 else ""}stationary')
+    return kpss_output["p-value"]
 
 
 def adf_test(timeseries, verbose=False):
     dftest = adfuller(timeseries)
-    dfoutput = pd.Series(dftest[0:4], index=[
-        'Test Statistic', 'p-value', '#Lags Used', 'Number of Observations Used'])
+    dfoutput = pd.Series(
+        dftest[0:4],
+        index=[
+            "Test Statistic",
+            "p-value",
+            "#Lags Used",
+            "Number of Observations Used",
+        ],
+    )
 
     if verbose:
-        print('Results of Dickey-Fuller Test:')
+        print("Results of Dickey-Fuller Test:")
         for key, value in dftest[4].items():
-            dfoutput['Critical Value (%s)' % key] = value
-        p_val = dfoutput['p-value']
-        print(
-            f'Result: The series is {"" if p_val < 0.05 else " not "} stationary')
-    return dfoutput['p-value']
+            dfoutput["Critical Value (%s)" % key] = value
+        p_val = dfoutput["p-value"]
+        print(f'Result: The series is {"" if p_val < 0.05 else " not "} stationary')
+    return dfoutput["p-value"]
 
 
 def hurst(ts):
@@ -60,16 +66,18 @@ def pp_test(timeseries, verbose=False):
 
 
 def cal_half_life(spread):
-    lag = np.roll(spread, 1)
-    lag[0] = 0
-    ret = spread - lag
-    ret[0] = 0
+    spread_lag = spread.shift(1)
+    spread_lag.iloc[0] = spread_lag.iloc[1]
 
-    # adds intercept terms to X variable for regression
-    lag2 = sm.add_constant(lag)
+    spread_ret = spread - spread_lag
+    spread_ret.iloc[0] = spread_ret.iloc[1]
 
-    model = sm.OLS(ret, lag2)
+    spread_lag2 = sm.add_constant(spread_lag)
+
+    model = sm.OLS(spread_ret, spread_lag2)
     res = model.fit()
+    halflife = int(round(-np.log(2) / res.params[1], 0))
 
-    return -np.log(2) / res.params[1]
-
+    if halflife <= 0:
+        halflife = 1
+    return halflife
